@@ -82,3 +82,10 @@ real:
   judges: [gpt-4o]          # e.g. [gpt-4o, claude-3.5-sonnet]
   judge_temperature: 0.0
   judge_max_subset: 0.30   # fraction of trajectories to re-annotate with multiple judges
+  # Stratified balanced sub-matrix: keep only tasks covered by ALL models, then
+  # sample up to `tasks_per_subset` per test subset. Gives a full, fully-crossed
+  # p x t (x s) array (balanced-ANOVA baseline works) and caps annotation cost.
+  # Seeded from config.yaml:seed. Use `--no-sample` to annotate the full corpus.
+  sample:
+    enabled: true
+    tasks_per_subset: 40
