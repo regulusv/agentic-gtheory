@@ -85,13 +85,16 @@ def _iter_nodes(traj: dict):
     ag = traj.get("answer_generation", traj)
     for key in ("train_messages", "chain", "messages", "conversation", "nodes"):
         seq = ag.get(key) if isinstance(ag, dict) else None
-        if isinstance(seq, list):
-            for item in seq:
-                # train_messages may be a list-of-lists of message dicts.
-                if isinstance(item, list):
-                    yield from (m for m in item if isinstance(m, dict))
-                elif isinstance(item, dict):
-                    yield item
+        if isinstance(seq, list) and seq:
+            inner_lists = [it for it in seq if isinstance(it, list)]
+            if inner_lists:
+                # train_messages is a list of DFS-tree snapshots, each a growing
+                # conversation prefix. Keep only the longest snapshot so we don't
+                # emit the same nodes many times over (the prefixes are nested).
+                longest = max(inner_lists, key=len)
+                yield from (m for m in longest if isinstance(m, dict))
+            else:
+                yield from (m for m in seq if isinstance(m, dict))
             return
 
 
@@ -134,6 +137,10 @@ def _query_id_from(traj: dict, fallback_stem: str) -> str:
 
 def _extract_query(traj: dict, nodes: list[dict]) -> str:
     """Best-effort recovery of the user query/instruction text."""
+    # ToolBench stores the user query under answer_generation; prefer it.
+    ag = traj.get("answer_generation") if isinstance(traj, dict) else None
+    if isinstance(ag, dict) and isinstance(ag.get("query"), str) and ag["query"].strip():
+        return ag["query"].strip()
     for k in ("query", "instruction", "Goal", "goal"):
         v = traj.get(k) if isinstance(traj, dict) else None
         if isinstance(v, str) and v.strip():
@@ -212,9 +219,15 @@ def parse_toolbench(raw_dir: str, method_filter: str | None = "dfs",
                 tid = f"{model}::{subset}::{qid}"
                 query = _extract_query(traj, nodes)
                 traj_text = _trajectory_text(nodes)
+                # `task` is subset-qualified: ToolBench query_ids are assigned
+                # per test-subset and DO collide across subsets (~13 in chatgpt_dfs),
+                # so a bare qid would conflate distinct queries (and two domains)
+                # into one task. subset::qid stays shared across model dirs, so the
+                # p x t design is still crossed.
+                task = f"{subset}::{qid}"
                 for skill in SKILLS:
                     rows.append({
-                        "trajectory_id": tid, "model": model, "task": qid,
+                        "trajectory_id": tid, "model": model, "task": task,
                         "domain": domain, "skill": skill,
                         "reached": _skill_reached(skill, nodes),
                         # Carried into the judge prompt (annotate_judge.context_cols):

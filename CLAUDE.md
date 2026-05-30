@@ -83,7 +83,14 @@ ships pre-computed trajectories for multiple model×method dirs (chatgpt_cot,
 chatgpt_dfs, gpt4_dfs, toolllama_dfs, ...). **No model APIs are needed** — this
 is secondary analysis. The ONLY API key required is for the judge (`j` facet).
 `config.yaml:real.method_filter='dfs'` keeps one method so p×t stays clean;
-`task` = ToolBench query_id (shared across models -> crossed design).
+`task` = `subset::query_id` (e.g. `G1_instruction::1010`). It is subset-qualified
+because ToolBench query_ids are assigned per test-subset and DO collide across
+subsets (~13 in chatgpt_dfs); a bare qid would conflate distinct queries (and two
+domains) into one task. `subset::qid` is still shared across model dirs, so the
+p×t design stays crossed. NB: `real.raw_dir` points at
+`reproduction_data/model_predictions/` (the per-query trajectories live one level
+below the unzip root; the sibling `model_predictions_converted/` is an aggregated
+format we do not use).
 
 ## Sanity expectations on synthetic data
 

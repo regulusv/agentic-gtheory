@@ -39,9 +39,15 @@ def main(config_path: str, dry_run: bool) -> None:
     )
     n_traj = trajectories["trajectory_id"].nunique()
     print(f"[parse] {n_traj} trajectories | models={sorted(trajectories['model'].unique())}")
-    print(f"[parse] tasks={trajectories['task'].nunique()} "
-          f"| reached rate per skill:")
-    print(trajectories.groupby('skill', observed=True)['reached'].mean().to_string())
+    print(f"[parse] tasks={trajectories['task'].nunique()}")
+    # Full-corpus reached coverage per skill (reached cells / total cells).
+    cov = (trajectories.groupby("skill", observed=True)["reached"]
+           .agg(reached="sum", total="size"))
+    cov["rate"] = cov["reached"] / cov["total"]
+    print("[parse] reached coverage per skill (full corpus):")
+    for skill, row in cov.iterrows():
+        print(f"    {skill:14} {int(row['reached']):>7}/{int(row['total']):<7} "
+              f"= {row['rate']:.4f}")
 
     if dry_run:
         print("\n[dry-run] parsing OK; skipping judge annotation and CSV write.")

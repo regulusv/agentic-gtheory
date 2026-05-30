@@ -69,7 +69,10 @@ dstudy:
 # ---------------------------------------------------------------------
 real:
   # Point this at the unzipped reproduction_data/ folder from ToolBench's Google Drive.
-  raw_dir: data/raw/reproduction_data
+  # NOTE: the per-query trajectories live one level deeper, under model_predictions/
+  # (top-level reproduction_data/ also holds model_predictions_converted/ — an
+  # aggregated, differently-shaped format we do NOT use — and human_cross_annotated_data.json).
+  raw_dir: data/raw/reproduction_data/model_predictions
   # Keep one inference method so the p x t design stays clean ("dfs" or "cot").
   # Set to null to keep all dirs and model `method` as an extra facet.
   method_filter: dfs
