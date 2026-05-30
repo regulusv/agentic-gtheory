@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+venv/
+# Data: keep a small committed sample; ignore bulk raw logs and processed tables.
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+# Generated artifacts
+outputs/*
+!outputs/.gitkeep
+requirements.lock.txt
+# Judge cache (regenerable, may be large / key-derived)
+*.judgecache.json

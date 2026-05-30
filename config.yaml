@@ -1,0 +1,81 @@
+# =====================================================================
+# Central configuration for the G-Theory agentic-evaluation pipeline.
+# Everything stochastic is seeded here so results are reproducible.
+# =====================================================================
+
+seed: 20260530
+
+paths:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  outputs_dir: outputs
+  # Canonical tidy long-format table consumed by gstudy/dstudy/viz.
+  long_table: data/processed/long.csv
+
+# ---------------------------------------------------------------------
+# Synthetic-data generator (scripts/make_synthetic.py).
+# Used to exercise the full pipeline end-to-end *without* real ToolBench
+# data or any judge API calls. The "true_sigmas" encode the hypothesised
+# story from the paper (small Model variance, large Task & Model x Task
+# variance) so the recovered components are interpretable.
+# ---------------------------------------------------------------------
+synthetic:
+  n_models: 6
+  n_domains: 4
+  tasks_per_domain: 5          # -> 20 tasks total, balanced & fully crossed
+  skills: [comprehension, tool_selection, formatting]   # ordered (cascade)
+  n_judges: 3
+  grand_mean_logit: 0.4        # baseline log-odds of step success
+  # Standard deviations of each random effect on the LOGIT scale.
+  true_sigmas:
+    p: 0.75      # Model  (universe score)  -- a real but modest signal
+    t: 1.20      # Task                      -- deliberately large
+    s: 0.35      # Skill
+    j: 0.40      # Judge
+    pt: 0.95     # Model x Task              -- deliberately large (idiosyncrasy)
+    ps: 0.30     # Model x Skill
+    ts: 0.55     # Task  x Skill
+    pts: 0.50    # Model x Task x Skill (highest interaction)
+  # Cascade: P(reach step k | reached step k-1). Comprehension is always reached.
+  reach_prob: [1.0, 0.95, 0.92]
+
+# ---------------------------------------------------------------------
+# G-Study variance-component estimation (src/gstudy.py).
+#   backend: "numpyro" (primary, gives posterior CIs) or "anova" (baseline).
+# ---------------------------------------------------------------------
+glmm:
+  backend: numpyro
+  num_warmup: 600
+  num_samples: 600
+  num_chains: 1
+  target_accept: 0.9
+  # Which coding of the binary outcome to model:
+  #   "marginal"    -> post-failure steps coded 0 (absorbing)
+  #   "conditional" -> only steps actually reached (hurdle); primary in paper
+  coding: conditional
+
+# ---------------------------------------------------------------------
+# D-Study reliability forecasting (src/dstudy.py).
+# Object of measurement = Model (p). Facets swept = tasks, skills, judges.
+# ---------------------------------------------------------------------
+dstudy:
+  n_t_grid: [5, 10, 15, 20, 30, 40, 60, 80, 100]
+  n_s_values: [1, 3, 5]
+  n_j_fixed: 1
+  phi_target: 0.8
+
+# ---------------------------------------------------------------------
+# Real-data path placeholders (fill before running parse/annotate).
+# ---------------------------------------------------------------------
+real:
+  # Point this at the unzipped reproduction_data/ folder from ToolBench's Google Drive.
+  raw_dir: data/raw/reproduction_data
+  # Keep one inference method so the p x t design stays clean ("dfs" or "cot").
+  # Set to null to keep all dirs and model `method` as an extra facet.
+  method_filter: dfs
+  # Optional explicit allow-list of <model>_<method> dir names (overrides method_filter).
+  # Leave empty to auto-select by method_filter. Typical DFS dirs:
+  models: []          # e.g. [chatgpt_dfs, gpt4_dfs, toolllama_dfs, ...]
+  judges: [gpt-4o]          # e.g. [gpt-4o, claude-3.5-sonnet]
+  judge_temperature: 0.0
+  judge_max_subset: 0.30   # fraction of trajectories to re-annotate with multiple judges
