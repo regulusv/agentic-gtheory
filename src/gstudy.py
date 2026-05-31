@@ -58,13 +58,17 @@ def variance_components_glmm(
     num_samples: int = 400,
     num_chains: int = 1,
     target_accept: float = 0.9,
+    sd_prior_scale: float = 2.0,
     seed: int = 0,
 ) -> pd.DataFrame:
     """Fit the crossed-RE logistic GLMM and summarise variance components.
 
     `df` must contain the facet columns and a binary outcome column `y`
     (produced by build_dataset.coding_view).
-    Returns a DataFrame: [source, var_mean, ci_low, ci_high, pct_of_total].
+    `sd_prior_scale` is the scale of the HalfNormal prior on every random-effect
+    SD (logit scale). 2.0 is weakly-informative; tighten (e.g. 1.0) to regularise
+    the heavy tail of near-separated interaction variances (pts) and aid mixing.
+    Returns a DataFrame: [source, var_mean, ci_low, ci_high, pct_of_total, r_hat, ess].
     """
     import jax
     import jax.numpy as jnp
@@ -90,7 +94,7 @@ def variance_components_glmm(
         mu = numpyro.sample("mu", dist.Normal(0.0, 5.0))
         logits = mu
         for name in effects:
-            sd = numpyro.sample(f"sd_{name}", dist.HalfNormal(2.0))
+            sd = numpyro.sample(f"sd_{name}", dist.HalfNormal(sd_prior_scale))
             # Non-centred parameterisation for stable sampling.
             with numpyro.plate(f"plate_{name}", n_levels[name]):
                 z = numpyro.sample(f"z_{name}", dist.Normal(0.0, 1.0))

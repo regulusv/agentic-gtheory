@@ -45,10 +45,13 @@ synthetic:
 # ---------------------------------------------------------------------
 glmm:
   backend: numpyro
-  num_warmup: 600
-  num_samples: 600
-  num_chains: 1
-  target_accept: 0.9
+  num_warmup: 2000
+  num_samples: 2000
+  num_chains: 4
+  target_accept: 0.97
+  # HalfNormal prior scale on every random-effect SD (logit). 2.0 weakly-informative;
+  # 1.0 regularises the heavy tail of near-separated interaction variances (pts).
+  sd_prior_scale: 1.0
   # Which coding of the binary outcome to model:
   #   "marginal"    -> post-failure steps coded 0 (absorbing)
   #   "conditional" -> only steps actually reached (hurdle); primary in paper

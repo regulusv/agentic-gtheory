@@ -35,7 +35,7 @@ def main(config_path: str) -> None:
             vc = variance_components_glmm(
                 analysis_df, num_warmup=gl["num_warmup"], num_samples=gl["num_samples"],
                 num_chains=gl["num_chains"], target_accept=gl["target_accept"],
-                seed=cfg["seed"],
+                sd_prior_scale=gl.get("sd_prior_scale", 2.0), seed=cfg["seed"],
             )
         except ImportError as e:
             print(f"[g-study] NumPyro/JAX unavailable ({e}); falling back to ANOVA baseline.")
