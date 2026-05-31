@@ -106,16 +106,26 @@ def variance_components_glmm(
     mcmc.run(jax.random.PRNGKey(seed))
     post = mcmc.get_samples()
 
+    # Convergence diagnostics (split R-hat, ESS) per variance component. R-hat
+    # needs >=2 chains; with 1 chain it is reported as NaN.
+    from numpyro.diagnostics import summary as _summary
+    grouped = mcmc.get_samples(group_by_chain=True)
+    diag = _summary({f"var_{n}": grouped[f"var_{n}"] for n in effects},
+                    group_by_chain=True)
+
     rows = []
     total = np.sum([np.mean(np.asarray(post[f"var_{n}"])) for n in effects])
     for name in effects:
         v = np.asarray(post[f"var_{name}"])
+        d = diag[f"var_{name}"]
         rows.append({
             "source": name,
             "var_mean": float(v.mean()),
             "ci_low": float(np.percentile(v, 2.5)),
             "ci_high": float(np.percentile(v, 97.5)),
             "pct_of_total": 100.0 * float(v.mean()) / total,
+            "r_hat": float(d.get("r_hat", np.nan)),
+            "ess": float(d.get("n_eff", np.nan)),
         })
     out = pd.DataFrame(rows)
     out.attrs["scale"] = "logit"
