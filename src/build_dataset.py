@@ -57,12 +57,27 @@ def build_long_table(trajectories: pd.DataFrame, judge_scores: pd.DataFrame) -> 
     repeated comprehension/tool_selection moments into one binary score per
     skill (see paper Limitations: construct validity of the skill taxonomy).
     """
-    merged = trajectories.merge(
+    judges = sorted(judge_scores["judge"].unique())
+
+    # Reached cells carry a real judge score (one row per judge that graded them).
+    reached = trajectories[trajectories["reached"] == 1]
+    merged = reached.merge(
         judge_scores, on=["trajectory_id", "skill"], how="left", validate="many_to_many"
     )
     if merged["correct"].isna().any():
         n = int(merged["correct"].isna().sum())
-        raise ValueError(f"{n} (trajectory, skill) cells have no judge score; check annotation coverage.")
+        raise ValueError(f"{n} REACHED (trajectory, skill) cells have no judge score; "
+                         f"check annotation coverage.")
+
+    # Unreached cells are never graded (the judge only sees reached steps -- the
+    # hurdle). They are structural 0s: replicate across all judges with correct=0
+    # so the marginal coding stays balanced. (The conditional coding drops them.)
+    unreached = trajectories[trajectories["reached"] == 0].copy()
+    if len(unreached):
+        unreached = unreached.merge(pd.DataFrame({"judge": judges}), how="cross")
+        unreached["correct"] = 0
+        merged = pd.concat([merged, unreached], ignore_index=True)
+
     return finalize_long_table(merged)
 
 
