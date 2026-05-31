@@ -45,8 +45,11 @@ synthetic:
 # ---------------------------------------------------------------------
 glmm:
   backend: numpyro
-  num_warmup: 2000
-  num_samples: 2000
+  # 4000/4000 x 4-chain is the paper spec: drives the p/t/s main effects under
+  # R-hat<1.01 (task-involving interactions stay slightly above -- structural,
+  # single-judge identifiability). Keep config == paper spec to avoid mixing.
+  num_warmup: 4000
+  num_samples: 4000
   num_chains: 4
   target_accept: 0.97
   # HalfNormal prior scale on every random-effect SD (logit). 2.0 weakly-informative;
@@ -82,9 +85,16 @@ real:
   # Optional explicit allow-list of <model>_<method> dir names (overrides method_filter).
   # Leave empty to auto-select by method_filter. Typical DFS dirs:
   models: []          # e.g. [chatgpt_dfs, gpt4_dfs, toolllama_dfs, ...]
-  judges: [gpt-4o]          # e.g. [gpt-4o, claude-3.5-sonnet]
+  judges: [gpt-4o]          # primary judge, annotates the full balanced sample
   judge_temperature: 0.0
   judge_max_subset: 0.30   # fraction of trajectories to re-annotate with multiple judges
+  # Multi-judge sub-study (scripts/build_multijudge.py): extra judges that grade
+  # only a stratified `multi_judge_tasks`-task subset of the sample, giving the
+  # 3-way (pts) interaction replication so it + judge variance become estimable.
+  # gpt-* -> OpenAI (OPENAI_API_KEY); claude-* -> Anthropic (CLAUDE_API_KEY).
+  # Non-OpenAI judge breaks the same-provider correlation that understates sigma^2_judge.
+  judges_multi: [claude-sonnet-4-6, gpt-4o-mini]
+  multi_judge_tasks: 80
   # Stratified balanced sub-matrix: keep only tasks covered by ALL models, then
   # sample up to `tasks_per_subset` per test subset. Gives a full, fully-crossed
   # p x t (x s) array (balanced-ANOVA baseline works) and caps annotation cost.
