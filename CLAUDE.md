@@ -50,6 +50,14 @@ Both the synthetic generator and the real path MUST emit exactly this schema so
 - Run the synthetic quickstart (`bash scripts/run_all.sh`) after any change to
   `gstudy`/`dstudy`/`viz` to confirm the pipeline still goes green.
 - New deps → add to `requirements.txt`; never commit API keys or the judge cache.
+- **Provenance (paper numbers)**: every number/figure/table in the paper MUST come
+  from a single run of a single commit. Output artifact filenames encode their spec
+  (e.g. `table_1_HN1.0_4000x4.tex`, `fig2_dstudy_HN1.0_4000x4.png`) and each `.tex`
+  embeds a `% PROVENANCE: commit=… seed=… prior=… sampler=…` line (written by
+  `scripts/regenerate_outputs.py`). Never mix components from different fits across a
+  Table/D-Study (e.g. the retired `HN(2.0)` 600/600/1-chain run gave a non-reproducible
+  E_ρ²≈0.62; the converged primary is `HN(1.0)` 4000/4000/4-chain). `run_pipeline.py`
+  writes unlabeled scratch outputs — do not cite those; cite the spec-tagged ones.
 
 ## TODO (priority order for the handoff)
 
