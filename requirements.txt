@@ -10,4 +10,5 @@ PyYAML>=6.0
 numpyro>=0.15
 jax>=0.4.25
 # Real judge-annotation path only (not needed for the synthetic quickstart):
-openai>=1.0          # judge annotation (real path); needs OPENAI_API_KEY
+openai>=1.0          # judge annotation (gpt-* judges); needs OPENAI_API_KEY
+anthropic>=0.40      # judge annotation (claude-* judges); needs CLAUDE_API_KEY

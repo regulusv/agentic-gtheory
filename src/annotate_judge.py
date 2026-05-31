@@ -73,21 +73,43 @@ def _build_prompt(step_context: dict, skill: str) -> str:
     )
 
 
-_CLIENT = None
+_CLIENTS: dict = {}
 
 
-def _client():
-    """Lazily create a module-level OpenAI client (reused across calls)."""
-    global _CLIENT
-    if _CLIENT is None:
+def _provider(judge: str) -> str:
+    """Route a judge id to its API provider by prefix (extend as needed)."""
+    j = judge.lower()
+    if j.startswith("claude"):
+        return "anthropic"
+    if j.startswith(("gpt", "o1", "o3", "o4", "chatgpt", "davinci")):
+        return "openai"
+    return "openai"  # default
+
+
+def _client(provider: str):
+    """Lazily create + cache one client per provider (reused across calls)."""
+    if provider in _CLIENTS:
+        return _CLIENTS[provider]
+    if provider == "openai":
         try:
             from openai import OpenAI
         except ImportError as e:
-            raise ImportError("pip install openai to run judge annotation.") from e
+            raise ImportError("pip install openai to run gpt-* judge annotation.") from e
         if not os.environ.get("OPENAI_API_KEY"):
             raise RuntimeError("Set OPENAI_API_KEY in your environment before annotating.")
-        _CLIENT = OpenAI()
-    return _CLIENT
+        _CLIENTS[provider] = OpenAI()
+    elif provider == "anthropic":
+        try:
+            import anthropic
+        except ImportError as e:
+            raise ImportError("pip install anthropic to run claude-* judge annotation.") from e
+        key = os.environ.get("CLAUDE_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
+        if not key:
+            raise RuntimeError("Set CLAUDE_API_KEY (or ANTHROPIC_API_KEY) before annotating.")
+        _CLIENTS[provider] = anthropic.Anthropic(api_key=key)
+    else:
+        raise ValueError(f"unknown provider {provider!r}")
+    return _CLIENTS[provider]
 
 
 def _parse_verdict(text: str) -> int:
@@ -103,21 +125,34 @@ def _parse_verdict(text: str) -> int:
     raise ValueError(f"could not parse a 0/1 verdict from: {text[:200]!r}")
 
 
+def _raw_judge(prompt: str, judge: str, temperature: float = 0.0, seed: int = 0,
+               max_tokens: int = 512) -> str:
+    """One provider-routed grading call -> raw response text (no parsing)."""
+    provider = _provider(judge)
+    client = _client(provider)
+    if provider == "anthropic":
+        resp = client.messages.create(
+            model=judge, max_tokens=max_tokens, temperature=temperature,
+            system=SYSTEM_MSG,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
+    # openai (Anthropic has no `seed`; OpenAI accepts it for determinism)
+    resp = client.chat.completions.create(
+        model=judge, temperature=temperature, seed=seed,
+        messages=[{"role": "system", "content": SYSTEM_MSG},
+                  {"role": "user", "content": prompt}],
+    )
+    return resp.choices[0].message.content
+
+
 def _call_judge(prompt: str, judge: str, temperature: float = 0.0, seed: int = 0,
                 max_retries: int = 4) -> int:
-    """OpenAI chat call -> binary verdict, with exponential backoff on errors."""
-    client = _client()
+    """Provider-routed grading call -> binary verdict, with backoff on errors."""
     last_err = None
     for attempt in range(max_retries):
         try:
-            resp = client.chat.completions.create(
-                model=judge,
-                temperature=temperature,
-                seed=seed,
-                messages=[{"role": "system", "content": SYSTEM_MSG},
-                          {"role": "user", "content": prompt}],
-            )
-            return _parse_verdict(resp.choices[0].message.content)
+            return _parse_verdict(_raw_judge(prompt, judge, temperature, seed))
         except Exception as e:  # network / rate-limit / parse error
             last_err = e
             time.sleep(2 ** attempt)
